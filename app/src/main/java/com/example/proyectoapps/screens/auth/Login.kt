@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,19 +39,19 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.proyectoapps.data.local.AppDatabase
+import com.example.proyectoapps.data.AppRepository
 import com.example.proyectoapps.navegation.Routes
 import com.example.proyectoapps.ui.theme.AppColors
 import com.example.proyectoapps.utils.SharedPrefsHelper
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
-// PANTALLA 1 — LOGIN
-// ─────────────────────────────────────────────
 @Composable
 fun PantallaLogin(navController: NavController) {
 
     val context     = LocalContext.current
-    val dao         = remember { AppDatabase.getInstance(context).usuarioDao() }
+    val repository  = remember { AppRepository() }
+    val auth        = remember { FirebaseAuth.getInstance() }
     val prefs       = remember { SharedPrefsHelper(context) }
     val scope       = rememberCoroutineScope()
 
@@ -68,7 +68,6 @@ fun PantallaLogin(navController: NavController) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Ícono superior
         Box(
             modifier = Modifier
                 .size(80.dp)
@@ -76,7 +75,7 @@ fun PantallaLogin(navController: NavController) {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Default.Lock,
                 contentDescription = "Logo",
                 tint = Color.White,
                 modifier = Modifier.size(40.dp)
@@ -85,7 +84,6 @@ fun PantallaLogin(navController: NavController) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Título y subtítulo
         Text(
             text = "Control de Asistencia",
             fontSize = 22.sp,
@@ -101,7 +99,6 @@ fun PantallaLogin(navController: NavController) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Tarjeta del formulario
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -110,7 +107,6 @@ fun PantallaLogin(navController: NavController) {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
 
-                // Campo correo
                 Text(
                     text = "Correo electrónico",
                     fontSize = 13.sp,
@@ -133,7 +129,6 @@ fun PantallaLogin(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Campo contraseña
                 Text(
                     text = "Contraseña",
                     fontSize = 13.sp,
@@ -155,7 +150,6 @@ fun PantallaLogin(navController: NavController) {
                     )
                 )
 
-                // Mensaje de error
                 if (error.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -167,30 +161,37 @@ fun PantallaLogin(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Botón iniciar sesión
                 Button(
                     onClick = {
                         if (correo.isBlank() || contrasena.isBlank()) {
                             error = "Por favor completa todos los campos."
                             return@Button
                         }
-                        scope.launch {
-                            cargando = true
-                            val usuario = dao.login(correo.trim(), contrasena.trim())
-                            cargando = false
-                            if (usuario != null) {
-                                prefs.guardarSesion(usuario.nombre, usuario.correo, usuario.rol)
-                                val destino = if (usuario.rol == "Profesor")
-                                    Routes.CURSOS_PROFESOR
-                                else
-                                    Routes.CURSOS_ESTUDIANTE
-                                navController.navigate(destino) {
-                                    popUpTo(Routes.LOGIN) { inclusive = true }
+                        cargando = true
+                        auth.signInWithEmailAndPassword(correo.trim(), contrasena.trim())
+                            .addOnSuccessListener { result ->
+                                val uid = result.user?.uid ?: ""
+                                scope.launch {
+                                    val usuario = repository.getUsuario(uid)
+                                    cargando = false
+                                    if (usuario != null) {
+                                        prefs.guardarSesion(uid, usuario.nombre, usuario.correo, usuario.rol)
+                                        val destino = if (usuario.rol == "Profesor")
+                                            Routes.CURSOS_PROFESOR
+                                        else
+                                            Routes.CURSOS_ESTUDIANTE
+                                        navController.navigate(destino) {
+                                            popUpTo(Routes.LOGIN) { inclusive = true }
+                                        }
+                                    } else {
+                                        error = "No se encontró el perfil del usuario."
+                                    }
                                 }
-                            } else {
-                                error = "Correo o contraseña incorrectos."
                             }
-                        }
+                            .addOnFailureListener { e ->
+                                cargando = false
+                                error = e.message ?: "Error al iniciar sesión"
+                            }
                     },
                     enabled = !cargando,
                     modifier = Modifier
@@ -215,16 +216,6 @@ fun PantallaLogin(navController: NavController) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Olvidaste contraseña
-        TextButton(onClick = {}) {
-            Text(
-                text = "¿Olvidaste tu contraseña?",
-                color = AppColors.AzulClaro,
-                fontSize = 13.sp
-            )
-        }
-
-        // Ir a registro
         TextButton(onClick = { navController.navigate(Routes.REGISTER) }) {
             Text(
                 text = "¿No tienes cuenta? Regístrate",

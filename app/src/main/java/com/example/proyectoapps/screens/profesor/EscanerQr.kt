@@ -1,48 +1,103 @@
 package com.example.proyectoapps.screens.profesor
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.proyectoapps.navegation.Routes
+import com.example.proyectoapps.data.AppRepository
+import com.example.proyectoapps.ui.theme.AppColors
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
 
-// PANTALLA 7 — ESCANER QR
-// ─────────────────────────────────────────────
 @Composable
 fun PantallaEscanerQR(
-    codigoCurso: String = "CS 101",
-    navController: NavController
+    codigoCurso: String,
+    navController: NavController,
+    viewModel: ProfesorViewModel = viewModel(factory = ProfesorViewModelFactory(AppRepository()))
 ) {
+    val context = LocalContext.current
+    
+    // Observar el resultado del registro
+    LaunchedEffect(Unit) {
+        viewModel.registroExitoso.collect { exito ->
+            if (exito) {
+                Toast.makeText(context, "Asistencia registrada correctamente", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Error al registrar asistencia", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            hasCameraPermission = granted
+            if (!granted) {
+                Toast.makeText(context, "Permiso de cámara denegado", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+
+    LaunchedEffect(key1 = true) {
+        if (!hasCameraPermission) {
+            launcher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    var lastScannedId by remember { mutableStateOf<String?>(null) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // TopBar oscuro
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -73,92 +128,151 @@ fun PantallaEscanerQR(
                     textAlign = TextAlign.Center
                 )
             }
-            Icon(
-                imageVector = Icons.Default.ExitToApp,
-                contentDescription = "Salir",
-                tint = Color.White,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .clickable { navController.navigate(Routes.LOGIN) }
-            )
         }
 
-        // Área de escaneo centrada
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 60.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Marco QR
-                MarcoQR()
+        if (hasCameraPermission) {
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                AndroidView(
+                    factory = { ctx ->
+                        val previewView = PreviewView(ctx)
+                        val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
-                Spacer(modifier = Modifier.height(36.dp))
+                        cameraProviderFuture.addListener({
+                            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+                            
+                            val preview = Preview.Builder().build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
 
-                Text(
-                    text = "Coloca el código QR dentro del marco",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
+                            val imageAnalysis = ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build()
+
+                            val barcodeScanner = BarcodeScanning.getClient()
+
+                            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                                processImageProxy(barcodeScanner, imageProxy, codigoCurso, viewModel) { rawValue ->
+                                    if (rawValue != lastScannedId) {
+                                        lastScannedId = rawValue
+                                    }
+                                }
+                            }
+
+                            try {
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    preview,
+                                    imageAnalysis
+                                )
+                            } catch (exc: Exception) {
+                                Log.e("Scanner", "Error al iniciar cámara", exc)
+                            }
+                        }, ContextCompat.getMainExecutor(ctx))
+                        previewView
+                    },
+                    modifier = Modifier.fillMaxSize()
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "El código se escaneará automáticamente",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
+                
+                MarcoVisualScanner()
+                
+                Column(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Coloca el código QR del alumno dentro del marco",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "El registro se sincronizará con Firebase",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        text = "Se requiere el permiso de cámara para poder escanear.",
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        fontSize = 15.sp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = { launcher.launch(Manifest.permission.CAMERA) },
+                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.AzulClaro),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Conceder Permiso")
+                    }
+                }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE — MARCO QR CON ESQUINAS AZULES
-// ─────────────────────────────────────────────
-@Composable
-fun MarcoQR(modifier: Modifier = Modifier) {
-    val azulQR = Color(0xFF2196F3)
-    val grosor = 4.dp
-    val tamanoEsquina = 28.dp
-    val tamanoMarco = 220.dp
+@OptIn(ExperimentalGetImage::class)
+private fun processImageProxy(
+    barcodeScanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    imageProxy: ImageProxy,
+    codigoCurso: String,
+    viewModel: ProfesorViewModel,
+    onSuccess: (String) -> Unit
+) {
+    val mediaImage = imageProxy.image
+    if (mediaImage != null) {
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        barcodeScanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                if (barcodes.isNotEmpty()) {
+                    val rawValue = barcodes[0].rawValue
+                    if (rawValue != null) {
+                        onSuccess(rawValue)
+                        viewModel.registrarAsistencia(rawValue, codigoCurso)
+                    }
+                }
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+            }
+    } else {
+        imageProxy.close()
+    }
+}
 
+@Composable
+fun MarcoVisualScanner() {
     Box(
-        modifier = modifier.size(tamanoMarco),
+        modifier = Modifier.size(220.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Esquina superior izquierda
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = grosor.toPx()
-            val corner = tamanoEsquina.toPx()
-            val color = azulQR
+            val stroke = 4.dp.toPx()
+            val corner = 28.dp.toPx()
+            val color = Color(0xFF2196F3)
 
-            // Superior izquierda
             drawLine(color, Offset(0f, corner), Offset(0f, 0f), stroke)
             drawLine(color, Offset(0f, 0f), Offset(corner, 0f), stroke)
-
-            // Superior derecha
             drawLine(color, Offset(size.width - corner, 0f), Offset(size.width, 0f), stroke)
             drawLine(color, Offset(size.width, 0f), Offset(size.width, corner), stroke)
-
-            // Inferior izquierda
             drawLine(color, Offset(0f, size.height - corner), Offset(0f, size.height), stroke)
             drawLine(color, Offset(0f, size.height), Offset(corner, size.height), stroke)
-
-            // Inferior derecha
             drawLine(color, Offset(size.width - corner, size.height), Offset(size.width, size.height), stroke)
             drawLine(color, Offset(size.width, size.height - corner), Offset(size.width, size.height), stroke)
         }
 
-        // Ícono central
         Icon(
             imageVector = Icons.Default.QrCodeScanner,
             contentDescription = null,
-            tint = azulQR.copy(alpha = 0.7f),
+            tint = Color(0xFF2196F3).copy(alpha = 0.7f),
             modifier = Modifier.size(56.dp)
         )
     }

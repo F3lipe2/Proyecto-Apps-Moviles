@@ -1,40 +1,16 @@
 package com.example.proyectoapps.screens.auth
 
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,22 +20,22 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.example.proyectoapps.data.local.AppDatabase
-import com.example.proyectoapps.data.local.Usuario
 import com.example.proyectoapps.navegation.Routes
 import com.example.proyectoapps.ui.theme.AppColors
 import com.example.proyectoapps.utils.SharedPrefsHelper
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 
-// PANTALLA — REGISTRO
-// ─────────────────────────────────────────────
 @Composable
 fun PantallaRegister(navController: NavController) {
 
     val context  = LocalContext.current
-    val dao      = remember { AppDatabase.getInstance(context).usuarioDao() }
     val prefs    = remember { SharedPrefsHelper(context) }
     val scope    = rememberCoroutineScope()
+    
+    val auth = remember { FirebaseAuth.getInstance() }
+    val firestore = remember { FirebaseFirestore.getInstance() }
 
     var nombre          by remember { mutableStateOf("") }
     var correo          by remember { mutableStateOf("") }
@@ -81,7 +57,6 @@ fun PantallaRegister(navController: NavController) {
 
         Spacer(modifier = Modifier.height(40.dp))
 
-        // Ícono superior
         Box(
             modifier = Modifier
                 .size(80.dp)
@@ -121,7 +96,6 @@ fun PantallaRegister(navController: NavController) {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
 
-                // Nombre
                 Text(text = "Nombre completo", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextoPrin)
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
@@ -139,7 +113,6 @@ fun PantallaRegister(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Correo
                 Text(text = "Correo electrónico", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextoPrin)
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
@@ -157,7 +130,6 @@ fun PantallaRegister(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Contraseña
                 Text(text = "Contraseña", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextoPrin)
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
@@ -176,7 +148,6 @@ fun PantallaRegister(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Confirmar contraseña
                 Text(text = "Confirmar contraseña", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextoPrin)
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
@@ -195,7 +166,6 @@ fun PantallaRegister(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Selector de rol
                 Text(text = "Rol", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = AppColors.TextoPrin)
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
@@ -214,7 +184,6 @@ fun PantallaRegister(navController: NavController) {
                     }
                 }
 
-                // Mensaje de error
                 if (error.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = error, color = Color(0xFFD32F2F), fontSize = 12.sp)
@@ -222,10 +191,8 @@ fun PantallaRegister(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Botón registrarse
                 Button(
                     onClick = {
-                        // Validaciones en el cliente
                         when {
                             nombre.isBlank() || correo.isBlank() || contrasena.isBlank() -> {
                                 error = "Por favor completa todos los campos."
@@ -240,34 +207,41 @@ fun PantallaRegister(navController: NavController) {
                                 return@Button
                             }
                         }
-                        scope.launch {
-                            cargando = true
-                            // Verificar si el correo ya está registrado
-                            val existente = dao.buscarPorCorreo(correo.trim())
-                            if (existente != null) {
-                                error = "Ya existe una cuenta con ese correo."
+                        
+                        cargando = true
+                        auth.createUserWithEmailAndPassword(correo.trim(), contrasena.trim())
+                            .addOnSuccessListener { result ->
+                                val uid = result.user?.uid ?: ""
+                                val userMap = hashMapOf(
+                                    "nombre" to nombre.trim(),
+                                    "correo" to correo.trim(),
+                                    "rol" to rolSeleccionado
+                                )
+                                
+                                firestore.collection("users").document(uid)
+                                    .set(userMap)
+                                    .addOnSuccessListener {
+                                        prefs.guardarSesion(uid, nombre.trim(), correo.trim(), rolSeleccionado)
+                                        cargando = false
+                                        val destino = if (rolSeleccionado == "Profesor")
+                                            Routes.CURSOS_PROFESOR
+                                        else
+                                            Routes.CURSOS_ESTUDIANTE
+                                        navController.navigate(destino) {
+                                            popUpTo(Routes.LOGIN) { inclusive = true }
+                                        }
+                                    }
+                                    .addOnFailureListener { e ->
+                                        cargando = false
+                                        error = e.message ?: "Error al guardar perfil"
+                                        // Si falla Firestore, eliminamos el usuario de Auth para permitir reintentar
+                                        result.user?.delete()
+                                    }
+                            }
+                            .addOnFailureListener { e ->
                                 cargando = false
-                                return@launch
+                                error = e.message ?: "Error en registro"
                             }
-                            // Crear el nuevo usuario
-                            val nuevoUsuario = Usuario(
-                                nombre = nombre.trim(),
-                                correo = correo.trim(),
-                                contrasena = contrasena.trim(),
-                                rol = rolSeleccionado
-                            )
-                            dao.registrar(nuevoUsuario)
-                            prefs.guardarSesion(nuevoUsuario.nombre, nuevoUsuario.correo, nuevoUsuario.rol)
-                            cargando = false
-
-                            val destino = if (rolSeleccionado == "Profesor")
-                                Routes.CURSOS_PROFESOR
-                            else
-                                Routes.CURSOS_ESTUDIANTE
-                            navController.navigate(destino) {
-                                popUpTo(Routes.LOGIN) { inclusive = true }
-                            }
-                        }
                     },
                     enabled = !cargando,
                     modifier = Modifier.fillMaxWidth().height(48.dp),

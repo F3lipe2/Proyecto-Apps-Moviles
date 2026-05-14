@@ -1,31 +1,25 @@
 package com.example.proyectoapps.screens.estudiante
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,16 +27,23 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.proyectoapps.navegation.Routes
 import com.example.proyectoapps.ui.theme.AppColors
+import com.example.proyectoapps.utils.QRUtils
+import com.example.proyectoapps.utils.SharedPrefsHelper
 
-// PANTALLA 3 — MI CÓDIGO QR
-// ─────────────────────────────────────────────
 @Composable
 fun PantallaMiCodigoQR(
-    navController: NavController,
-    nombre: String = "Alice Johnson",
-    correo: String = "alumno@universidad.edu",
-    idEstudiante: String = "STU001"
+    navController: NavController
 ) {
+    val context = LocalContext.current
+    val prefs = remember { SharedPrefsHelper(context) }
+    val nombre = prefs.getNombre()
+    val correo = prefs.getCorreo()
+    val idEstudiante = prefs.getUserId()
+
+    val qrBitmap = remember(idEstudiante) {
+        QRUtils.generarCodigoQR(idEstudiante.toString(), 512)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -85,13 +86,18 @@ fun PantallaMiCodigoQR(
                 tint = Color.White,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .clickable { navController.navigate(Routes.LOGIN) }
+                    .clickable {
+                        com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                        prefs.cerrarSesion()
+                        navController.navigate(Routes.LOGIN) {
+                            popUpTo(0)
+                        }
+                    }
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Tarjeta de perfil
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,7 +112,6 @@ fun PantallaMiCodigoQR(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -144,7 +149,6 @@ fun PantallaMiCodigoQR(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Tarjeta del código QR
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -159,20 +163,19 @@ fun PantallaMiCodigoQR(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Imagen QR de placeholder
-                // Cuando tengas la librería de QR reemplaza este Box por el componente real
                 Box(
                     modifier = Modifier
                         .size(200.dp)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp)),
+                        .background(Color.White, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCode2,
-                        contentDescription = "Código QR",
-                        tint = AppColors.TextoPrin,
-                        modifier = Modifier.size(160.dp)
-                    )
+                    qrBitmap?.let {
+                        Image(
+                            bitmap = it.asImageBitmap(),
+                            contentDescription = "Código QR Alumno",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } ?: Text(text = "Error al generar QR", color = Color.Red)
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))

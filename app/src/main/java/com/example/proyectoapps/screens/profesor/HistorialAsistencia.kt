@@ -1,17 +1,9 @@
 package com.example.proyectoapps.screens.profesor
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -21,33 +13,41 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.proyectoapps.AsistenciaEstudiante
-import com.example.proyectoapps.RegistroAsistencia
-import com.example.proyectoapps.TopBarAzul
-import com.example.proyectoapps.asistenciasEjemplo
+import com.example.proyectoapps.data.AppRepository
+import com.example.proyectoapps.data.local.Asistencia
+import com.example.proyectoapps.data.local.Usuario
 import com.example.proyectoapps.ui.theme.AppColors
 
-// PANTALLA 5 — HISTORIAL DE ASISTENCIA
-// ─────────────────────────────────────────────
 @Composable
 fun PantallaHistorialAsistencia(
-    codigoCurso: String = "CS 101",
-    asistencias: List<AsistenciaEstudiante> = asistenciasEjemplo,
-    navController: NavController
+    codigoCurso: String,
+    navController: NavController,
+    viewModel: ProfesorViewModel = viewModel(factory = ProfesorViewModelFactory(AppRepository()))
 ) {
+    val asistencias by viewModel.asistencias.collectAsState()
+    val estudiantes by viewModel.estudiantes.collectAsState()
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(codigoCurso) {
+        val curso = viewModel.getCursoPorCodigo(codigoCurso)
+        curso?.let {
+            viewModel.cargarEstudiantes(it.codigo)
+            viewModel.cargarAsistencias(it.codigo)
+        }
+        isLoading = false
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -61,54 +61,63 @@ fun PantallaHistorialAsistencia(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(asistencias) { asistencia ->
-                TarjetaAsistenciaEstudiante(asistencia = asistencia)
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = AppColors.AzulClaro)
+            }
+        } else {
+            if (estudiantes.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(text = "No hay estudiantes en este curso", color = AppColors.TextoSec)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(estudiantes) { estudiante ->
+                        val asistenciasEstudiante = asistencias.filter { it.idEstudiante == estudiante.id }
+                        // Asumiendo que el total de clases es el número de fechas únicas de asistencia en el curso
+                        val totalFechas = asistencias.map { it.fecha }.distinct().size.coerceAtLeast(1)
+                        
+                        TarjetaAsistenciaEstudianteLocal(
+                            estudiante = estudiante,
+                            registros = asistenciasEstudiante,
+                            totalClases = totalFechas
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE — TARJETA ASISTENCIA CON EXPANSIÓN
-// ─────────────────────────────────────────────
 @Composable
-fun TarjetaAsistenciaEstudiante(
-    asistencia: AsistenciaEstudiante,
-    modifier: Modifier = Modifier
+fun TarjetaAsistenciaEstudianteLocal(
+    estudiante: Usuario,
+    registros: List<Asistencia>,
+    totalClases: Int
 ) {
-    val presentes = asistencia.registros.count { it.presente }
-    val porcentaje = if (asistencia.totalClases > 0)
-        (presentes * 100) / asistencia.totalClases else 0
-    val expandida = asistencia.registros.isNotEmpty()
+    var expandida by remember { mutableStateOf(false) }
+    val presentes = registros.count { it.presente }
+    val porcentaje = (presentes * 100) / totalClases
 
-    val colorPorcentaje = when {
-        porcentaje >= 80 -> Color(0xFF388E3C)
-        porcentaje >= 50 -> Color(0xFFF57C00)
-        else             -> Color(0xFFD32F2F)
-    }
-    val fondoPorcentaje = when {
-        porcentaje >= 80 -> Color(0xFFE8F5E9)
-        porcentaje >= 50 -> Color(0xFFFFF3E0)
-        else             -> Color(0xFFFFEBEE)
-    }
+    val colorPorcentaje = if (porcentaje >= 75) Color(0xFF388E3C) else Color(0xFFD32F2F)
+    val fondoPorcentaje = if (porcentaje >= 75) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expandida = !expandida },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = AppColors.GrisTarjeta),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            // Fila principal
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar con inicial
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -116,7 +125,7 @@ fun TarjetaAsistenciaEstudiante(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = asistencia.estudiante.nombre.first().toString(),
+                        text = estudiante.nombre.first().toString(),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.AzulClaro
@@ -126,20 +135,24 @@ fun TarjetaAsistenciaEstudiante(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
+                    val displayNombre = if (estudiante.nombre.startsWith("Estudiante ")) {
+                        "ID: ${estudiante.id.take(8)}..."
+                    } else {
+                        estudiante.nombre
+                    }
                     Text(
-                        text = asistencia.estudiante.nombre,
+                        text = displayNombre,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AppColors.TextoPrin
                     )
                     Text(
-                        text = "$presentes / ${asistencia.totalClases} clases",
+                        text = if (estudiante.nombre.startsWith("Estudiante ")) "Perfil no sincronizado" else "$presentes / $totalClases clases",
                         fontSize = 12.sp,
-                        color = colorPorcentaje
+                        color = if (estudiante.nombre.startsWith("Estudiante ")) AppColors.TextoSec else colorPorcentaje
                     )
                 }
 
-                // Badge de porcentaje
                 Box(
                     modifier = Modifier
                         .background(fondoPorcentaje, RoundedCornerShape(6.dp))
@@ -156,33 +169,34 @@ fun TarjetaAsistenciaEstudiante(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Icon(
-                    imageVector = if (expandida) Icons.Default.KeyboardArrowUp
-                    else Icons.Default.KeyboardArrowDown,
+                    imageVector = if (expandida) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
                     tint = AppColors.TextoSec,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            // Registros expandidos
-            if (expandida) {
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider(color = Color(0xFFEEEEEE))
-                Spacer(modifier = Modifier.height(8.dp))
-                asistencia.registros.forEach { registro ->
-                    FilaRegistroAsistencia(registro = registro)
-                    Spacer(modifier = Modifier.height(6.dp))
+            AnimatedVisibility(visible = expandida) {
+                Column {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = Color(0xFFEEEEEE))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (registros.isEmpty()) {
+                        Text(text = "Sin registros", fontSize = 12.sp, color = AppColors.TextoSec)
+                    } else {
+                        registros.forEach { registro ->
+                            FilaRegistroAsistenciaLocal(registro = registro)
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-// ─────────────────────────────────────────────
-// COMPONENTE — FILA DE REGISTRO (fecha + estado)
-// ─────────────────────────────────────────────
 @Composable
-fun FilaRegistroAsistencia(registro: RegistroAsistencia) {
+fun FilaRegistroAsistenciaLocal(registro: Asistencia) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -195,8 +209,7 @@ fun FilaRegistroAsistencia(registro: RegistroAsistencia) {
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                imageVector = if (registro.presente) Icons.Default.CheckCircle
-                else Icons.Default.Cancel,
+                imageVector = if (registro.presente) Icons.Default.CheckCircle else Icons.Default.Cancel,
                 contentDescription = null,
                 tint = if (registro.presente) Color(0xFF388E3C) else Color(0xFFD32F2F),
                 modifier = Modifier.size(16.dp)

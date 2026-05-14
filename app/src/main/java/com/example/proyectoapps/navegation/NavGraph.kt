@@ -7,8 +7,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.proyectoapps.cursosEjemplo
-import com.example.proyectoapps.cursosEstudianteEjemplo
 import com.example.proyectoapps.screens.auth.PantallaLogin
 import com.example.proyectoapps.screens.auth.PantallaRegister
 import com.example.proyectoapps.utils.SharedPrefsHelper
@@ -60,8 +58,7 @@ fun NavGraph() {
             arguments = listOf(navArgument("codigoCurso") { type = NavType.StringType })
         ) { backStackEntry ->
             val codigoCurso = backStackEntry.arguments?.getString("codigoCurso") ?: ""
-            val curso = cursosEjemplo.find { it.codigo == codigoCurso } ?: cursosEjemplo.first()
-            PantallaDetalleCurso(curso = curso, navController = navController)
+            PantallaDetalleCurso(codigoCurso = codigoCurso, navController = navController)
         }
 
         composable(
@@ -102,9 +99,7 @@ fun NavGraph() {
             arguments = listOf(navArgument("codigoCurso") { type = NavType.StringType })
         ) { backStackEntry ->
             val codigoCurso = backStackEntry.arguments?.getString("codigoCurso") ?: ""
-            val curso = cursosEstudianteEjemplo.find { it.codigo == codigoCurso }
-                ?: cursosEstudianteEjemplo.first()
-            PantallaDetalleCursoEstudiante(curso = curso, navController = navController)
+            PantallaDetalleCursoEstudiante(codigoCurso = codigoCurso, navController = navController)
         }
 
         composable(
