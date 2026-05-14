@@ -82,7 +82,7 @@ class AppRepository {
             var user = getUsuario(uid)
             if (user == null) {
                 Log.w("AppRepository", "Usando perfil temporal para $uid")
-                user = Usuario(id = uid, nombre = "Estudiante ${uid.take(5)}", rol = "estudiante")
+                user = Usuario(id = uid, nombre = "Cargando nombre...", rol = "estudiante")
             }
             
             db.collection("cursos").document(code)
@@ -99,13 +99,32 @@ class AppRepository {
 
     suspend fun getEstudiantesPorCurso(codigoCurso: String): List<Usuario> {
         return try {
-            val snapshot = db.collection("cursos").document(formatCode(codigoCurso))
+            val code = formatCode(codigoCurso)
+            val snapshot = db.collection("cursos").document(code)
                 .collection("estudiantes").get().await()
-            // CRÍTICO: Mapear el ID del documento al campo id del objeto Usuario
-            snapshot.documents.mapNotNull { doc ->
+            
+            val estudiantesLinked = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(Usuario::class.java)?.copy(id = doc.id)
             }
+
+            // Para cada estudiante, intentamos obtener el nombre real de la colección 'users'
+            // Esto corrige datos antiguos o perfiles temporales
+            estudiantesLinked.map { estu ->
+                val perfilReal = getUsuario(estu.id)
+                if (perfilReal != null) {
+                    // Si el perfil en el curso estaba incompleto, lo actualizamos silenciosamente
+                    if (estu.nombre.contains("Cargando") || estu.nombre.contains("Estudiante ") || estu.nombre.isEmpty()) {
+                        db.collection("cursos").document(code)
+                            .collection("estudiantes").document(estu.id)
+                            .set(perfilReal)
+                    }
+                    perfilReal
+                } else {
+                    estu
+                }
+            }
         } catch (e: Exception) {
+            Log.e("AppRepository", "Error en getEstudiantesPorCurso: ${e.message}")
             emptyList()
         }
     }

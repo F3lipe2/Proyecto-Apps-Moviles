@@ -122,27 +122,22 @@ fun TarjetaEstudianteLocal(estudiante: Usuario, modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                val displayNombre = if (estudiante.nombre.startsWith("Estudiante ")) {
-                    "ID: ${estudiante.id.take(8)}..."
-                } else {
-                    estudiante.nombre
-                }
                 Text(
-                    text = displayNombre,
+                    text = estudiante.nombre,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = AppColors.TextoPrin
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (estudiante.nombre.startsWith("Estudiante ")) Icons.Default.Person else Icons.Default.Email,
+                        imageVector = Icons.Default.Email,
                         contentDescription = null,
                         tint = AppColors.TextoSec,
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (estudiante.nombre.startsWith("Estudiante ")) "Perfil no sincronizado" else estudiante.correo,
+                        text = estudiante.correo.ifEmpty { "Correo no disponible" },
                         fontSize = 11.sp,
                         color = AppColors.TextoSec
                     )

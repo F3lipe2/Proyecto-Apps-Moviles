@@ -135,21 +135,16 @@ fun TarjetaAsistenciaEstudianteLocal(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    val displayNombre = if (estudiante.nombre.startsWith("Estudiante ")) {
-                        "ID: ${estudiante.id.take(8)}..."
-                    } else {
-                        estudiante.nombre
-                    }
                     Text(
-                        text = displayNombre,
+                        text = estudiante.nombre,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AppColors.TextoPrin
                     )
                     Text(
-                        text = if (estudiante.nombre.startsWith("Estudiante ")) "Perfil no sincronizado" else "$presentes / $totalClases clases",
+                        text = "$presentes / $totalClases clases",
                         fontSize = 12.sp,
-                        color = if (estudiante.nombre.startsWith("Estudiante ")) AppColors.TextoSec else colorPorcentaje
+                        color = colorPorcentaje
                     )
                 }
 
