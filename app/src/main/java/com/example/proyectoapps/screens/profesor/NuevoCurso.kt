@@ -2,17 +2,21 @@ package com.example.proyectoapps.screens.profesor
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +30,18 @@ import com.example.proyectoapps.navegation.Routes
 import com.example.proyectoapps.ui.theme.AppColors
 import com.example.proyectoapps.utils.SharedPrefsHelper
 
+// Paleta de colores disponibles para las cards de cursos
+private val paletaColores = listOf(
+    "#3D8BCD" to "Azul",
+    "#5C6BC0" to "Índigo",
+    "#7B52A8" to "Violeta",
+    "#2E9E6B" to "Verde",
+    "#D97706" to "Ámbar",
+    "#DC2626" to "Rojo",
+    "#0891B2" to "Cian",
+    "#374151" to "Grafito"
+)
+
 @Composable
 fun PantallaNuevoCurso(
     navController: NavController,
@@ -38,18 +54,26 @@ fun PantallaNuevoCurso(
     var nombre by remember { mutableStateOf("") }
     var codigo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
+    var colorSeleccionado by remember { mutableStateOf(paletaColores[0].first) }
     var errorNombre by remember { mutableStateOf(false) }
     var errorCodigo by remember { mutableStateOf(false) }
+
+    // Color actual como objeto Color de Compose
+    val colorActual = remember(colorSeleccionado) {
+        try { Color(android.graphics.Color.parseColor(colorSeleccionado)) }
+        catch (e: Exception) { Color(0xFF3D8BCD) }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(AppColors.GrisFondo)
     ) {
+        // ── Encabezado (preview de la card) ──────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(AppColors.AzulClaro)
+                .background(colorActual)
                 .statusBarsPadding()
         ) {
             Column {
@@ -76,7 +100,7 @@ fun PantallaNuevoCurso(
                         imageVector = Icons.Default.ExitToApp,
                         contentDescription = "Salir",
                         tint = Color.White,
-                        modifier = Modifier.clickable { 
+                        modifier = Modifier.clickable {
                             com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                             prefs.cerrarSesion()
                             navController.navigate(Routes.LOGIN) {
@@ -106,13 +130,13 @@ fun PantallaNuevoCurso(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if(nombre.isEmpty()) "Nombre del curso" else nombre,
+                            text = if (nombre.isEmpty()) "Nombre del curso" else nombre,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
                         )
                         Text(
-                            text = if(codigo.isEmpty()) "CÓDIGO" else codigo.uppercase(),
+                            text = if (codigo.isEmpty()) "CÓDIGO" else codigo.uppercase(),
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
@@ -121,6 +145,7 @@ fun PantallaNuevoCurso(
             }
         }
 
+        // ── Formulario ────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -154,7 +179,9 @@ fun PantallaNuevoCurso(
                     value = descripcion,
                     onValueChange = { if (it.length <= 120) descripcion = it },
                     placeholder = { Text("Describe brevemente el contenido del curso...", color = AppColors.TextoSec, fontSize = 13.sp) },
-                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         unfocusedBorderColor = Color(0xFFE0E0E0),
@@ -165,8 +192,54 @@ fun PantallaNuevoCurso(
                     text = "${descripcion.length}/120",
                     fontSize = 11.sp,
                     color = AppColors.TextoSec,
-                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(top = 4.dp)
                 )
+            }
+
+            // ── Selector de color ─────────────────────────────────────────
+            Column {
+                Text(
+                    text = "Color de la card",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = AppColors.TextoPrin
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    paletaColores.forEach { (hex, nombre) ->
+                        val esSeleccionado = hex == colorSeleccionado
+                        val colorCirculo = remember(hex) {
+                            try { Color(android.graphics.Color.parseColor(hex)) }
+                            catch (e: Exception) { Color(0xFF3D8BCD) }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(colorCirculo)
+                                .then(
+                                    if (esSeleccionado)
+                                        Modifier.border(3.dp, Color.White, CircleShape)
+                                    else Modifier
+                                )
+                                .clickable { colorSeleccionado = hex },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (esSeleccionado) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Seleccionado: $nombre",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -175,9 +248,9 @@ fun PantallaNuevoCurso(
                 onClick = {
                     if (nombre.isBlank()) errorNombre = true
                     if (codigo.isBlank()) errorCodigo = true
-                    
+
                     if (nombre.isNotBlank() && codigo.isNotBlank()) {
-                        viewModel.crearCurso(nombre, codigo, descripcion, idProfesor) { success ->
+                        viewModel.crearCurso(nombre, codigo, descripcion, idProfesor, colorSeleccionado) { success ->
                             if (success) {
                                 Toast.makeText(context, "Curso creado con éxito", Toast.LENGTH_SHORT).show()
                                 navController.popBackStack()
@@ -187,9 +260,11 @@ fun PantallaNuevoCurso(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.AzulClaro)
+                colors = ButtonDefaults.buttonColors(containerColor = colorActual)
             ) {
                 Text(text = "Crear Curso", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
             }

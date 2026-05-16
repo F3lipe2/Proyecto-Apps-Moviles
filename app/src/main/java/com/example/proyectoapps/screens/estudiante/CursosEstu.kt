@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -126,6 +127,12 @@ fun TarjetaCursoEstudianteLocal(
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // Parsear el color guardado, con fallback al azul por defecto
+    val colorHeader = remember(curso.color) {
+        try { Color(android.graphics.Color.parseColor(curso.color)) }
+        catch (e: Exception) { Color(0xFF3D8BCD) }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -135,10 +142,11 @@ fun TarjetaCursoEstudianteLocal(
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
+            // Cabecera coloreada
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.AzulClaro)
+                    .background(colorHeader)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column {
@@ -155,12 +163,33 @@ fun TarjetaCursoEstudianteLocal(
                     )
                 }
             }
+            // Cuerpo: descripción + profesor
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(
-                    text = curso.descripcion,
-                    fontSize = 13.sp,
-                    color = AppColors.TextoSec
-                )
+                if (curso.descripcion.isNotBlank()) {
+                    Text(
+                        text = curso.descripcion,
+                        fontSize = 13.sp,
+                        color = AppColors.TextoSec
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                // Nombre del profesor
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Profesor",
+                        tint = colorHeader,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (curso.nombreProfesor.isNotBlank()) curso.nombreProfesor
+                               else "Profesor no disponible",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = AppColors.TextoPrin
+                    )
+                }
             }
         }
     }

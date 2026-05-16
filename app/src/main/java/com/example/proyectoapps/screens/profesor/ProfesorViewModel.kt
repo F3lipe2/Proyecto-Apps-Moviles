@@ -33,13 +33,14 @@ class ProfesorViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun crearCurso(nombre: String, codigo: String, descripcion: String, idProfesor: String, onResult: (Boolean) -> Unit) {
+    fun crearCurso(nombre: String, codigo: String, descripcion: String, idProfesor: String, color: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             val nuevoCurso = Curso(
                 nombre = nombre,
                 codigo = codigo,
                 descripcion = descripcion,
-                idProfesor = idProfesor
+                idProfesor = idProfesor,
+                color = color
             )
             val exito = repository.crearCurso(nuevoCurso)
             if (exito) cargarCursos(idProfesor)

@@ -30,7 +30,12 @@ class AppRepository {
     suspend fun crearCurso(curso: Curso): Boolean {
         return try {
             val normalizedCode = formatCode(curso.codigo)
-            val cursoFinal = curso.copy(codigo = normalizedCode)
+            // Obtener el nombre real del profesor para guardarlo en el curso
+            val profesor = getUsuario(curso.idProfesor)
+            val cursoFinal = curso.copy(
+                codigo = normalizedCode,
+                nombreProfesor = profesor?.nombre ?: ""
+            )
             db.collection("cursos").document(normalizedCode).set(cursoFinal).await()
             true
         } catch (e: Exception) {
@@ -146,7 +151,17 @@ class AppRepository {
                 .whereEqualTo("idEstudiante", idEstudiante.trim())
                 .get().await()
             val codigos = snapshot.documents.mapNotNull { it.getString("codigoCurso") }.distinct()
-            codigos.mapNotNull { getCursoPorCodigo(it) }
+            codigos.mapNotNull { codigo ->
+                val curso = getCursoPorCodigo(codigo) ?: return@mapNotNull null
+                // Si el campo nombreProfesor ya está guardado en Firestore lo usamos;
+                // si no (cursos viejos), lo buscamos on-the-fly.
+                if (curso.nombreProfesor.isNotBlank()) {
+                    curso
+                } else {
+                    val nombreProf = getUsuario(curso.idProfesor)?.nombre ?: ""
+                    curso.copy(nombreProfesor = nombreProf)
+                }
+            }
         } catch (e: Exception) {
             emptyList()
         }
