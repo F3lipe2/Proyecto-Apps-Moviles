@@ -259,12 +259,16 @@ app/build/outputs/apk/debug/app-debug.apk
 
 Al crear un curso, el profesor puede elegir entre 8 colores predefinidos:
 
-| Color | Hex | | Color | Hex |
-|---|---|---|---|---|
-| Azul | `#3D8BCD` | | Verde | `#2E9E6B` |
-| Índigo | `#5C6BC0` | | Ámbar | `#D97706` |
-| Violeta | `#7B52A8` | | Rojo | `#DC2626` |
-| Cian | `#0891B2` | | Grafito | `#374151` |
+| Muestra | Nombre | Hex |
+|:---:|---|:---:|
+| ![Azul](https://img.shields.io/badge/-%20-3D8BCD?style=for-the-badge) | Azul | `#3D8BCD` |
+| ![Índigo](https://img.shields.io/badge/-%20-5C6BC0?style=for-the-badge) | Índigo | `#5C6BC0` |
+| ![Violeta](https://img.shields.io/badge/-%20-7B52A8?style=for-the-badge) | Violeta | `#7B52A8` |
+| ![Verde](https://img.shields.io/badge/-%20-2E9E6B?style=for-the-badge) | Verde | `#2E9E6B` |
+| ![Ámbar](https://img.shields.io/badge/-%20-D97706?style=for-the-badge) | Ámbar | `#D97706` |
+| ![Rojo](https://img.shields.io/badge/-%20-DC2626?style=for-the-badge) | Rojo | `#DC2626` |
+| ![Cian](https://img.shields.io/badge/-%20-0891B2?style=for-the-badge) | Cian | `#0891B2` |
+| ![Grafito](https://img.shields.io/badge/-%20-374151?style=for-the-badge) | Grafito | `#374151` |
 
 Los estudiantes ven el color elegido por el profesor en la cabecera de cada card, junto al nombre del profesor encargado del curso.
 
