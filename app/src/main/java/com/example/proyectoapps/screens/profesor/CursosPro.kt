@@ -132,10 +132,14 @@ fun TarjetaCurso(curso: Curso, onClick: () -> Unit = {}, modifier: Modifier = Mo
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
+            val cardColor = remember(curso.color) {
+                try { Color(android.graphics.Color.parseColor(curso.color)) }
+                catch (e: Exception) { AppColors.AzulClaro }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(AppColors.AzulClaro)
+                    .background(cardColor)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Column {
