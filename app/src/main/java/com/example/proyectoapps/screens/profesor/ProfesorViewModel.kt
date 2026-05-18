@@ -74,4 +74,9 @@ class ProfesorViewModel(private val repository: AppRepository) : ViewModel() {
     suspend fun getCursoPorCodigo(codigo: String): Curso? {
         return repository.getCursoPorCodigo(codigo)
     }
+
+    // Nuevo método para obtener el nombre del estudiante
+    suspend fun getNombreEstudiante(idEstudiante: String): String {
+        return repository.getUsuario(idEstudiante)?.nombre ?: idEstudiante
+    }
 }

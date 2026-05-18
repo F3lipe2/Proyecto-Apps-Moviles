@@ -18,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,11 +39,8 @@ fun PantallaHistorialAsistencia(
     var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(codigoCurso) {
-        val curso = viewModel.getCursoPorCodigo(codigoCurso)
-        curso?.let {
-            viewModel.cargarEstudiantes(it.codigo)
-            viewModel.cargarAsistencias(it.codigo)
-        }
+        viewModel.cargarEstudiantes(codigoCurso)
+        viewModel.cargarAsistencias(codigoCurso)
         isLoading = false
     }
 
@@ -76,14 +72,17 @@ fun PantallaHistorialAsistencia(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(estudiantes) { estudiante ->
-                        val asistenciasEstudiante = asistencias.filter { it.idEstudiante == estudiante.id }
-                        // Asumiendo que el total de clases es el número de fechas únicas de asistencia en el curso
-                        val totalFechas = asistencias.map { it.fecha }.distinct().size.coerceAtLeast(1)
+                        // Filtramos las asistencias de este estudiante específico
+                        val asistenciasEstudiante = asistencias.filter { 
+                            it.idEstudiante.trim() == estudiante.id.trim() 
+                        }
+                        
+                        val totalClases = asistencias.map { it.fecha }.distinct().size.coerceAtLeast(1)
                         
                         TarjetaAsistenciaEstudianteLocal(
                             estudiante = estudiante,
                             registros = asistenciasEstudiante,
-                            totalClases = totalFechas
+                            totalClases = totalClases
                         )
                     }
                 }
@@ -125,7 +124,7 @@ fun TarjetaAsistenciaEstudianteLocal(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = estudiante.nombre.first().toString(),
+                        text = estudiante.nombre.ifEmpty { "E" }.first().toString().uppercase(),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = AppColors.AzulClaro
@@ -136,13 +135,13 @@ fun TarjetaAsistenciaEstudianteLocal(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = estudiante.nombre,
+                        text = estudiante.nombre.ifEmpty { "Estudiante Sin Nombre" },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = AppColors.TextoPrin
                     )
                     Text(
-                        text = "$presentes / $totalClases clases",
+                        text = "$presentes / $totalClases asistencias",
                         fontSize = 12.sp,
                         color = colorPorcentaje
                     )
